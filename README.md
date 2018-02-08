@@ -1,125 +1,147 @@
-# Behaviorial Cloning Project
+# **Behavioral Cloning** 
 
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
 Overview
 ---
-This repository contains starting files for the Behavioral Cloning Project.
 
-In this project, you will use what you've learned about deep neural networks and convolutional neural networks to clone driving behavior. You will train, validate and test a model using Keras. The model will output a steering angle to an autonomous vehicle.
+The goal of this project is to build a neural network that models steering angles needed for a simulated vehicle to drive itself autonomously on a racetrack. The network is trained on images and steering data, and outputs steering angles to be used by the car. The provided simulator was used to collect additional data of good driving behavior.
 
-We have provided a simulator where you can steer a car around a track for data collection. You'll use image data and steering angles to train a neural network and then use this model to drive the car autonomously around the track.
 
-We also want you to create a detailed writeup of the project. Check out the [writeup template](https://github.com/udacity/CarND-Behavioral-Cloning-P3/blob/master/writeup_template.md) for this project and use it as a starting point for creating your own writeup. The writeup can be either a markdown file or a pdf document.
+[//]: # (Image References)
 
-To meet specifications, the project will require submitting five files: 
-* model.py (script used to create and train the model)
-* drive.py (script to drive the car - feel free to modify this file)
-* model.h5 (a trained Keras model)
-* a report writeup file (either markdown or pdf)
-* video.mp4 (a video recording of your vehicle driving autonomously around the track for at least one full lap)
+[image1]: ./images/nvidia_cnn.png "Model Visualization"
+[image2]: ./images/center.png "Center"
+[image3]: ./images/sway1.png "Recovery 1"
+[image4]: ./images/sway2.png "Recovery 2"
+[image5]: ./images/sway3.png "Recovery 3"
+[image6]: ./images/sway4.png "Recovery 4"
+[image7]: ./images/flip_pre.png "Original Image"
+[image8]: ./images/flip_post.png "Flipped Image"
 
-This README file describes how to output the video in the "Details About Files In This Directory" section.
 
-Creating a Great Writeup
+
+Model Architecture
 ---
-A great writeup should include the [rubric points](https://review.udacity.com/#!/rubrics/432/view) as well as your description of how you addressed each point.  You should include a detailed description of the code used (with line-number references and code snippets where necessary), and links to other supporting documents or external references.  You should include images in your writeup to demonstrate how your code works with examples.  
 
-All that said, please be concise!  We're not looking for you to write a book here, just a brief description of how you passed each rubric point, and references to the relevant code :). 
+The model used in this project is based on the CNN model presented in [End-to-End Learning for Self-Driving Cars](http://images.nvidia.com/content/tegra/automotive/images/2016/solutions/pdf/end-to-end-dl-using-px.pdf) from NVidia, with slight modifications.
 
-You're not required to use markdown for your writeup.  If you use another method please just submit a pdf of your writeup.
+The model consists of five convolution layers, followed by fully connected layers that regresses to a single predicted value of steering. The first three convolution layers are each 5x5 kernels with 2x2 strides, whereas the last two convolution layers are 3x3 kernels with 1x1 strides. Each convolution layer has a RELU activation to introduce non-linearities.
 
-The Project
+The outputs of the last convolution layer is flattened and are fed into a series of fully connected layers. Each layer output employs a dropout probability of 0.5.
+
+Below is a visualization of the network, taken from the aforementioned paper.
+
+![cnn][image1]
+
+
+The final model is summarized as follows:
+
+| Layer         		|     Description	        					| 
+|:---------------------:|:---------------------------------------------:| 
+| Input         		| 160x320x3 RGB image   						| 
+| Normalization       	| Normalizes input images  						|
+| Cropping		     	| Input: 160x320x3; Output: 80x320x3		 	|
+| Convolution 5x5     	| 24 5x5 kernels, 2x2 stride					|
+| RELU 					|												|
+| Convolution 5x5     	| 36 5x5 kernels, 2x2 stride					|
+| RELU 					|												|
+| Convolution 5x5     	| 48 5x5 kernels, 2x2 stride					|
+| RELU 					|												|
+| Convolution 3x3     	| 64 5x5 kernels, 1x1 stride					|
+| RELU 					|												|
+| Convolution 3x3     	| 64 5x5 kernels, 1x1 stride					|
+| RELU 					|												|
+| Flatten			    | 												|
+| Fully connected		| Input: 1164, Output: 100						|
+| RELU					| 												|
+| Dropout				| Drop rate: 0.5								|
+| Fully connected		| Input: 100, Output: 50						|
+| RELU 					|												|
+| Dropout				| Drop rate: 0.5								|
+| Fully connected		| Input: 50, Output: 10							|
+| Fully connected		| Input: 10, Output: 1							|
+| Output 				| Steering value prediction						|
+
+
+#### Attempts to Reduce Overfitting
+
+[Dropout](https://keras.io/layers/core/#dropout) layers were included in the network within the fully connected layers. Not only does this implicitly induce ensemble learning in the model, it helps avoid overfitting by acting as a form of regularization. During training, dropout rate of 0.5 was used. 
+
+[Early Stopping](https://keras.io/callbacks/#earlystopping) was another technique used to avoid overfitting. `model.fit` method can take in callback functions that get executed at the end of each epoch. Early stopping checks for various conditions to decide whether to continue training into the new epoch. For the training of this model, the validation loss was monitored with a patience of 2 epochs (i.e, stop training when 2 epochs of no improvements in validation loss). This was used in conjunction with [ModelCheckpoint](https://keras.io/callbacks/#modelcheckpoint) so that the best intermediate model so far can be restored. 
+
+
+#### Model parameter tuning
+
+The model uses the Adam optimizer, which automatically computes adaptive learning rates ([reference](http://ruder.io/optimizing-gradient-descent/index.html#adam)). Thus, the learning rate was not manually tuned. 
+
+The use of Early stopping mitigated the need for searching the best epoch count. The value for dropout rate was set based on empirical results.
+
+
+
+Training Data 
 ---
-The goals / steps of this project are the following:
-* Use the simulator to collect data of good driving behavior 
-* Design, train and validate a model that predicts a steering angle from image data
-* Use the model to drive the vehicle autonomously around the first track in the simulator. The vehicle should remain on the road for an entire loop around the track.
-* Summarize the results with a written report
 
-### Dependencies
-This lab requires:
+The training data used is composed of the provided sample data for track1, as well as additional training data created using the training mode of the simulator. The center, left, and right images of the car are used during training.
 
-* [CarND Term1 Starter Kit](https://github.com/udacity/CarND-Term1-Starter-Kit)
+The data collected from the simulator are composed of several runs of recording. The following styles of training data were collected:
 
-The lab enviroment can be created with CarND Term1 Starter Kit. Click [here](https://github.com/udacity/CarND-Term1-Starter-Kit/blob/master/README.md) for the details.
+- __Good Driving__ : In these samples, the car maintains alignment with the center of the road, as much as possible.
+- __Examples of Recovery__: These samples contain cases in which the car recovers from going off of the road by applying steering when too close to the outer edges of the road. This will help the model identify situations in which proper steering is required. 
+- __Reverse traversal__ of the track: While the simulation starts out with a counter-clockwise orientation on the road, providing a clock-wise driving around the track will help generalze better and provide more examples.
 
-The following resources can be found in this github repository:
-* drive.py
-* video.py
-* writeup_template.md
+Furthermore, additional examples were created by mirroring each available image and steering measurement pair. 
 
-The simulator can be downloaded from the classroom. In the classroom, we have also provided sample data that you can optionally use to help train your model.
 
-## Details About Files In This Directory
 
-### `drive.py`
+Solution Design Approach
+---
 
-Usage of `drive.py` requires you have saved the trained model as an h5 file, i.e. `model.h5`. See the [Keras documentation](https://keras.io/getting-started/faq/#how-can-i-save-a-keras-model) for how to create this file using the following command:
-```sh
-model.save(filepath)
-```
+This section lists a bit of detail regarding the iterative process taken to build the model.
 
-Once the model has been saved, it can be used with drive.py using this command:
+The first attempt was based on [LeNet-5](http://yann.lecun.com/exdb/lenet/), but it was not able to handle some of the first few curves. This led to a collection of more training samples as previously mentioned. 
 
-```sh
-python drive.py model.h5
-```
+A common theme was for the validation loss to oscillate while the training loss kept decreasing. This indicated overfitting, thus Dropout and Early stopping was introduced. 
 
-The above command will load the trained model and use the model to make predictions on individual images in real-time and send the predicted angle back to the server via a websocket connection.
+While the vehicle was struggling to complete a full lap, the addition of various techniques such as cropping the image to the region of interest, the use of left and right side cameras on top of the center image, and data augmentation led to the vehicle being able to get close to almost completeing a full lap.
 
-Note: There is known local system's setting issue with replacing "," with "." when using drive.py. When this happens it can make predicted steering values clipped to max/min values. If this occurs, a known fix for this is to add "export LANG=en_US.utf8" to the bashrc file.
+Eventually, I transitioned to using the CNN from the NVidia paper. This model seemed to provide better results empirically.
 
-#### Saving a video of the autonomous agent
+Additional data from a few more simulation runs were added, since in some cases the car was getting too close to the edges. 
 
-```sh
-python drive.py model.h5 run1
-```
+At the end of the process, the vehicle is able to drive autonomously around the track without leaving the road. A footage of this is available in the repo [here](https://github.com/enju244/CarND-Behavioral-Cloning/blob/master/video.mp4).
 
-The fourth argument, `run1`, is the directory in which to save the images seen by the agent. If the directory already exists, it'll be overwritten.
 
-```sh
-ls run1
 
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_424.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_451.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_477.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_528.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_573.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_618.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_697.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_723.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_749.jpg
-[2017-01-09 16:10:23 EST]  12KiB 2017_01_09_21_10_23_817.jpg
-...
-```
 
-The image file name is a timestamp of when the image was seen. This information is used by `video.py` to create a chronological video of the agent driving.
+Creation of the Training Set & Training Process
+---
 
-### `video.py`
+As mentioned in the "Training Data" section, samples were generated from simulations of various styles, including good driving behavior, recoveries to center, and driving the course in reverse.
 
-```sh
-python video.py run1
-```
+A few laps were simulated and recorded with good driving behavior, which emphasizes staying in the center of the lane as much as possible. The following is an example image of center lane driving:
 
-Creates a video based on images found in the `run1` directory. The name of the video will be the name of the directory followed by `'.mp4'`, so, in this case the video will be `run1.mp4`.
+![center][image2]
 
-Optionally, one can specify the FPS (frames per second) of the video:
 
-```sh
-python video.py run1 --fps 48
-```
+Samples involving recoveries to the center lane included a several sequences throughout the lap that may look like the following sequence:
 
-Will run the video at 48 FPS. The default FPS is 60.
 
-#### Why create a video
+![sway1][image3]
+![sway2][image4]
+![sway3][image5]
+![sway4][image6]
 
-1. It's been noted the simulator might perform differently based on the hardware. So if your model drives succesfully on your machine it might not on another machine (your reviewer). Saving a video is a solid backup in case this happens.
-2. You could slightly alter the code in `drive.py` and/or `video.py` to create a video of what your model sees after the image is processed (may be helpful for debugging).
+Starting from the top, 1. the car is heading towards the right-side edge of the road, 2. steering is applied towards the center, 3. the car has overshot a bit too much to the left, and 4. eventually readjust back into the center of the lane. The idea is to record samples of such recovery back to the center, so that the network will be able to do the same in similar situations.
 
-### Tips
-- Please keep in mind that training images are loaded in BGR colorspace using cv2 while drive.py load images in RGB to predict the steering angles.
+Flipped versions of the collected images were augmented to the data set. Since the car is oriented counter-clockwise in the track, earlier models had a bias towards turning left. To deal with this left turn bias, flipping images and taking the opposite sign of the steering measurement provided examples for right turn bias, which helps balance out the bias and also generalize the model. Below is an example image taken from the center camera, followed by it's flipped version.
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+![pre][image7]
+
+![post][image8]
+
+
+After this process, there were 93,240 data points available. Since the dataset was very large, a generator was used to pass the images in batches, reducing the working set size. This approach is memory efficient and helped improve the training speed. Shuffling the data was done as part of the generator. The training and validation data split was done at a ratio of 8:2. 
+
+The image pre-processing was 'built-in' to the network. The input images were normalized, and then cropped to remove the areas of the image containing sky and the body of the car, prior to the first convolution layer of the network.
 
